@@ -37,7 +37,6 @@ locations = {
 
 selected_location = st.selectbox("Select a Location in India", list(locations.keys()))
 lat, lon = locations[selected_location]
-
 st.write(f"**Coordinates:** Latitude = {lat}, Longitude = {lon}")
 
 # ---------------------
@@ -47,14 +46,23 @@ start_date = st.date_input("Start Date", value=pd.to_datetime("2024-01-01"))
 end_date = st.date_input("End Date", value=pd.to_datetime("2024-01-31"))
 
 # ---------------------
+# SESSION STATE FOR BUTTON
+# ---------------------
+if "analyze_clicked" not in st.session_state:
+    st.session_state.analyze_clicked = False
+
+def on_analyze_click():
+    st.session_state.analyze_clicked = True
+
+st.button("Analyze Location", on_click=on_analyze_click)
+
+# ---------------------
 # ANALYSIS FUNCTION
 # ---------------------
 def analyze_location(lat, lon, start_date, end_date):
     point = ee.Geometry.Point([lon, lat])
 
-    # ---------------------
     # NDVI CALCULATION
-    # ---------------------
     s2 = (ee.ImageCollection("COPERNICUS/S2_SR")
           .filterBounds(point)
           .filterDate(str(start_date), str(end_date))
@@ -92,11 +100,8 @@ def analyze_location(lat, lon, start_date, end_date):
         color = "red"
         ndvi_str = f"{mean_ndvi:.3f}"
 
-    # ---------------------
-    # SOIL INFORMATION (OpenLandMap)
-    # ---------------------
+    # SOIL INFORMATION
     soil_info = {}
-
     def get_soil_value(img, band_name, buffer=250, scale=250):
         try:
             bands = img.bandNames().getInfo()
@@ -111,51 +116,36 @@ def analyze_location(lat, lon, start_date, end_date):
         except Exception:
             return None
 
-    # Organic Carbon
     soil_oc = ee.Image("OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02")
     soil_oc_band = "ocd_usda.6a1c_m_sl1_250m"
     oc_val = get_soil_value(soil_oc, soil_oc_band)
     soil_info["Organic Carbon (g/kg)"] = f"{oc_val:.2f}" if oc_val is not None else "No Data"
 
-    # Soil pH
     soil_ph = ee.Image("OpenLandMap/SOL/SOL_PH-H2O_USDA-4C1A2A_M/v02")
     soil_ph_band = "phh2o_usda.4c1a2a_m_sl1_250m"
     ph_val = get_soil_value(soil_ph, soil_ph_band)
     soil_info["Soil pH (H2O)"] = f"{ph_val:.2f}" if ph_val is not None else "No Data"
 
-    # Sand Fraction
     soil_sand = ee.Image("OpenLandMap/SOL/SOL_SAND-Content_USDA-3A1A1A_M/v02")
     soil_sand_band = "sand_usda.3a1a1a_m_sl1_250m"
     sand_val = get_soil_value(soil_sand, soil_sand_band)
     soil_info["Sand Fraction (%)"] = f"{sand_val:.2f}" if sand_val is not None else "No Data"
 
-    # Clay Fraction
     soil_clay = ee.Image("OpenLandMap/SOL/SOL_CLAY-Content_USDA-3A1A1A_M/v02")
     soil_clay_band = "clay_usda.3a1a1a_m_sl1_250m"
     clay_val = get_soil_value(soil_clay, soil_clay_band)
     soil_info["Clay Fraction (%)"] = f"{clay_val:.2f}" if clay_val is not None else "No Data"
 
-    # ---------------------
     # MAP VISUALIZATION
-    # ---------------------
     m = geemap.Map(center=[lat, lon], zoom=12)
-
-    ndvi_vis = {
-        "min": 0.0,
-        "max": 1.0,
-        "palette": ["red", "yellow", "green"]
-    }
+    ndvi_vis = {"min": 0.0, "max": 1.0, "palette": ["red", "yellow", "green"]}
     m.add_layer(ndvi_img, ndvi_vis, "NDVI Background")
 
     popup_text = f"NDVI: {ndvi_str}\nStatus: {status}\n"
     for k, v in soil_info.items():
         popup_text += f"{k}: {v}\n"
 
-    folium.Marker(
-        location=[lat, lon],
-        popup=popup_text,
-        icon=folium.Icon(color=color)
-    ).add_to(m)
+    folium.Marker(location=[lat, lon], popup=popup_text, icon=folium.Icon(color=color)).add_to(m)
 
     # Legend
     legend_html = """
@@ -172,20 +162,16 @@ def analyze_location(lat, lon, start_date, end_date):
     """
     m.get_root().html.add_child(folium.Element(legend_html))
 
-    # ---------------------
     # RESULTS DISPLAY
-    # ---------------------
     st.subheader("📊 Results")
     st.write(f"**Location:** {selected_location}")
     st.write(f"**NDVI:** {ndvi_str} → **{status} vegetation**")
-
     st.write("### 🌍 Soil Properties")
     st.json(soil_info)
-
     st_folium(m, width="100%", height=600)
 
 # ---------------------
-# BUTTON TRIGGER
+# RUN ANALYSIS ONLY IF BUTTON CLICKED
 # ---------------------
-if st.button("Analyze Location"):
+if st.session_state.analyze_clicked:
     analyze_location(lat, lon, start_date, end_date)
