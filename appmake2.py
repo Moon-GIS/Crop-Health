@@ -185,6 +185,7 @@ def analyze_location(lat, lon, start_date, end_date):
     st_folium(m, width="100%", height=600)
 
 # ---------------------
-# RUN ANALYSIS AUTOMATICALLY
+# BUTTON TRIGGER
 # ---------------------
-analyze_location(lat, lon, start_date, end_date)
+if st.button("Analyze Location"):
+    analyze_location(lat, lon, start_date, end_date)
