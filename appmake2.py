@@ -8,10 +8,10 @@ from streamlit_folium import st_folium
 # ---------------------
 # PAGE CONFIG
 # ---------------------
-st.set_page_config(layout="wide", page_title="Crop Health Dashboard")
+st.set_page_config(layout="wide", page_title="Crop Health + Soil Dashboard")
 
 # ---------------------
-# AUTHENTICATE EARTH ENGINE
+# EARTH ENGINE AUTH
 # ---------------------
 SERVICE_ACCOUNT = st.secrets["google_earth_engine"]["client_email"]
 PRIVATE_KEY = st.secrets["google_earth_engine"]["private_key"]
@@ -74,19 +74,49 @@ if st.button("Analyze Location"):
         ndvi_str = f"{mean_ndvi:.3f}"
 
     # ---------------------
-    # SOIL INFORMATION (SoilGrids dataset)
+    # SOIL INFORMATION (OpenLandMap)
     # ---------------------
-    soil = ee.Image("OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02")
-    soil_value = soil.reduceRegion(
+    soil_info = {}
+
+    # Organic Carbon
+    soil_oc = ee.Image("OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02")
+    soil_oc_band = "ocd_usda.6a1c_m_sl1_250m"
+    oc_val = soil_oc.reduceRegion(
         reducer=ee.Reducer.mean(),
         geometry=point.buffer(250),
         scale=250
-    ).get("ocd_usda.6a1c_m_mean").getInfo()
+    ).get(soil_oc_band).getInfo()
+    soil_info["Organic Carbon (g/kg)"] = f"{oc_val:.2f}" if oc_val else "No Data"
 
-    if soil_value:
-        soil_str = f"{soil_value:.2f} g/kg"
-    else:
-        soil_str = "No Data"
+    # Soil pH
+    soil_ph = ee.Image("OpenLandMap/SOL/SOL_PH-H2O_USDA-4C1A2A_M/v02")
+    soil_ph_band = "phh2o_usda.4c1a2a_m_sl1_250m"
+    ph_val = soil_ph.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=point.buffer(250),
+        scale=250
+    ).get(soil_ph_band).getInfo()
+    soil_info["Soil pH (H2O)"] = f"{ph_val:.2f}" if ph_val else "No Data"
+
+    # Sand Fraction
+    soil_sand = ee.Image("OpenLandMap/SOL/SOL_SAND-Content_USDA-3A1A1A_M/v02")
+    soil_sand_band = "sand_usda.3a1a1a_m_sl1_250m"
+    sand_val = soil_sand.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=point.buffer(250),
+        scale=250
+    ).get(soil_sand_band).getInfo()
+    soil_info["Sand Fraction (%)"] = f"{sand_val:.2f}" if sand_val else "No Data"
+
+    # Clay Fraction
+    soil_clay = ee.Image("OpenLandMap/SOL/SOL_CLAY-Content_USDA-3A1A1A_M/v02")
+    soil_clay_band = "clay_usda.3a1a1a_m_sl1_250m"
+    clay_val = soil_clay.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=point.buffer(250),
+        scale=250
+    ).get(soil_clay_band).getInfo()
+    soil_info["Clay Fraction (%)"] = f"{clay_val:.2f}" if clay_val else "No Data"
 
     # ---------------------
     # MAP VISUALIZATION
@@ -100,16 +130,20 @@ if st.button("Analyze Location"):
     }
     m.add_layer(ndvi_img, ndvi_vis, "NDVI Background")
 
+    popup_text = f"NDVI: {ndvi_str}\nStatus: {status}\n"
+    for k, v in soil_info.items():
+        popup_text += f"{k}: {v}\n"
+
     folium.Marker(
         location=[lat, lon],
-        popup=f"NDVI: {ndvi_str}\nStatus: {status}\nSoil Organic Carbon: {soil_str}",
+        popup=popup_text,
         icon=folium.Icon(color=color)
     ).add_to(m)
 
-    # Add legend
+    # Legend
     legend_html = """
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 200px; height: 140px; 
+                bottom: 50px; left: 50px; width: 200px; height: 160px; 
                 border:2px solid grey; z-index:9999; font-size:14px;
                 background-color:white; padding: 10px;">
     <b>Legend</b><br>
@@ -121,9 +155,14 @@ if st.button("Analyze Location"):
     """
     m.get_root().html.add_child(folium.Element(legend_html))
 
+    # ---------------------
+    # RESULTS
+    # ---------------------
     st.subheader("📊 Results")
     st.write(f"**Latitude:** {lat}, **Longitude:** {lon}")
     st.write(f"**NDVI:** {ndvi_str} → **{status} vegetation**")
-    st.write(f"**Soil Organic Carbon:** {soil_str}")
+
+    st.write("### 🌍 Soil Properties")
+    st.json(soil_info)
 
     st_folium(m, width="100%", height=600)
