@@ -46,7 +46,10 @@ st.write(f"**Coordinates:** Latitude = {lat}, Longitude = {lon}")
 start_date = st.date_input("Start Date", value=pd.to_datetime("2024-01-01"))
 end_date = st.date_input("End Date", value=pd.to_datetime("2024-01-31"))
 
-if st.button("Analyze Location"):
+# ---------------------
+# ANALYSIS FUNCTION
+# ---------------------
+def analyze_location(lat, lon, start_date, end_date):
     point = ee.Geometry.Point([lon, lat])
 
     # ---------------------
@@ -90,7 +93,7 @@ if st.button("Analyze Location"):
         ndvi_str = f"{mean_ndvi:.3f}"
 
     # ---------------------
-    # SOIL INFORMATION (OpenLandMap) - SAFELY
+    # SOIL INFORMATION (OpenLandMap)
     # ---------------------
     soil_info = {}
 
@@ -170,7 +173,7 @@ if st.button("Analyze Location"):
     m.get_root().html.add_child(folium.Element(legend_html))
 
     # ---------------------
-    # RESULTS
+    # RESULTS DISPLAY
     # ---------------------
     st.subheader("📊 Results")
     st.write(f"**Location:** {selected_location}")
@@ -180,3 +183,8 @@ if st.button("Analyze Location"):
     st.json(soil_info)
 
     st_folium(m, width="100%", height=600)
+
+# ---------------------
+# RUN ANALYSIS AUTOMATICALLY
+# ---------------------
+analyze_location(lat, lon, start_date, end_date)
