@@ -50,11 +50,14 @@ if st.button("Analyze Location"):
 
     ndvi_img = s2.map(add_ndvi).median().select("NDVI")
 
-    mean_ndvi = ndvi_img.reduceRegion(
-        reducer=ee.Reducer.mean(),
-        geometry=point.buffer(30),
-        scale=10
-    ).get("NDVI").getInfo()
+    try:
+        mean_ndvi = ndvi_img.reduceRegion(
+            reducer=ee.Reducer.mean(),
+            geometry=point.buffer(30),
+            scale=10
+        ).get("NDVI").getInfo()
+    except Exception:
+        mean_ndvi = None
 
     if mean_ndvi is None:
         status = "No Data"
@@ -74,49 +77,47 @@ if st.button("Analyze Location"):
         ndvi_str = f"{mean_ndvi:.3f}"
 
     # ---------------------
-    # SOIL INFORMATION (OpenLandMap)
+    # SOIL INFORMATION (OpenLandMap) - SAFELY
     # ---------------------
     soil_info = {}
+
+    def get_soil_value(img, band_name, buffer=250, scale=250):
+        try:
+            bands = img.bandNames().getInfo()
+            if band_name not in bands:
+                return None
+            val = img.reduceRegion(
+                reducer=ee.Reducer.mean(),
+                geometry=point.buffer(buffer),
+                scale=scale
+            ).get(band_name).getInfo()
+            return val
+        except Exception:
+            return None
 
     # Organic Carbon
     soil_oc = ee.Image("OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02")
     soil_oc_band = "ocd_usda.6a1c_m_sl1_250m"
-    oc_val = soil_oc.reduceRegion(
-        reducer=ee.Reducer.mean(),
-        geometry=point.buffer(250),
-        scale=250
-    ).get(soil_oc_band).getInfo()
-    soil_info["Organic Carbon (g/kg)"] = f"{oc_val:.2f}" if oc_val else "No Data"
+    oc_val = get_soil_value(soil_oc, soil_oc_band)
+    soil_info["Organic Carbon (g/kg)"] = f"{oc_val:.2f}" if oc_val is not None else "No Data"
 
     # Soil pH
     soil_ph = ee.Image("OpenLandMap/SOL/SOL_PH-H2O_USDA-4C1A2A_M/v02")
     soil_ph_band = "phh2o_usda.4c1a2a_m_sl1_250m"
-    ph_val = soil_ph.reduceRegion(
-        reducer=ee.Reducer.mean(),
-        geometry=point.buffer(250),
-        scale=250
-    ).get(soil_ph_band).getInfo()
-    soil_info["Soil pH (H2O)"] = f"{ph_val:.2f}" if ph_val else "No Data"
+    ph_val = get_soil_value(soil_ph, soil_ph_band)
+    soil_info["Soil pH (H2O)"] = f"{ph_val:.2f}" if ph_val is not None else "No Data"
 
     # Sand Fraction
     soil_sand = ee.Image("OpenLandMap/SOL/SOL_SAND-Content_USDA-3A1A1A_M/v02")
     soil_sand_band = "sand_usda.3a1a1a_m_sl1_250m"
-    sand_val = soil_sand.reduceRegion(
-        reducer=ee.Reducer.mean(),
-        geometry=point.buffer(250),
-        scale=250
-    ).get(soil_sand_band).getInfo()
-    soil_info["Sand Fraction (%)"] = f"{sand_val:.2f}" if sand_val else "No Data"
+    sand_val = get_soil_value(soil_sand, soil_sand_band)
+    soil_info["Sand Fraction (%)"] = f"{sand_val:.2f}" if sand_val is not None else "No Data"
 
     # Clay Fraction
     soil_clay = ee.Image("OpenLandMap/SOL/SOL_CLAY-Content_USDA-3A1A1A_M/v02")
     soil_clay_band = "clay_usda.3a1a1a_m_sl1_250m"
-    clay_val = soil_clay.reduceRegion(
-        reducer=ee.Reducer.mean(),
-        geometry=point.buffer(250),
-        scale=250
-    ).get(soil_clay_band).getInfo()
-    soil_info["Clay Fraction (%)"] = f"{clay_val:.2f}" if clay_val else "No Data"
+    clay_val = get_soil_value(soil_clay, soil_clay_band)
+    soil_info["Clay Fraction (%)"] = f"{clay_val:.2f}" if clay_val is not None else "No Data"
 
     # ---------------------
     # MAP VISUALIZATION
@@ -166,3 +167,4 @@ if st.button("Analyze Location"):
     st.json(soil_info)
 
     st_folium(m, width="100%", height=600)
+
