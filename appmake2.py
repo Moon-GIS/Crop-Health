@@ -25,11 +25,24 @@ ee.Initialize(credentials)
 st.title("🌱 Crop Health & Soil Dashboard")
 
 # ---------------------
-# USER INPUT
+# LOCATIONS DROPDOWN
 # ---------------------
-lat = st.number_input("Enter Latitude", value=22.5726, format="%.6f")
-lon = st.number_input("Enter Longitude", value=88.3639, format="%.6f")
+locations = {
+    "Kolkata, West Bengal": (22.5726, 88.3639),
+    "Nagpur, Maharashtra": (21.1458, 79.0882),
+    "Chennai, Tamil Nadu": (13.0827, 80.2707),
+    "Varanasi, Uttar Pradesh": (25.3176, 82.9739),
+    "Bengaluru, Karnataka": (12.9716, 77.5946)
+}
 
+selected_location = st.selectbox("Select a Location in India", list(locations.keys()))
+lat, lon = locations[selected_location]
+
+st.write(f"**Coordinates:** Latitude = {lat}, Longitude = {lon}")
+
+# ---------------------
+# DATE INPUT
+# ---------------------
 start_date = st.date_input("Start Date", value=pd.to_datetime("2024-01-01"))
 end_date = st.date_input("End Date", value=pd.to_datetime("2024-01-31"))
 
@@ -160,11 +173,10 @@ if st.button("Analyze Location"):
     # RESULTS
     # ---------------------
     st.subheader("📊 Results")
-    st.write(f"**Latitude:** {lat}, **Longitude:** {lon}")
+    st.write(f"**Location:** {selected_location}")
     st.write(f"**NDVI:** {ndvi_str} → **{status} vegetation**")
 
     st.write("### 🌍 Soil Properties")
     st.json(soil_info)
 
     st_folium(m, width="100%", height=600)
-
